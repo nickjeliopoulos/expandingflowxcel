@@ -31,8 +31,9 @@ python scripts/smoke.py
 # 2. Analytic FLOP/byte model. CPU-only -- no GPU, no torch import.
 python -m bench.roofline --config lm1b
 
-# Correctness. Every backend is checked against a float64 reference.
-pytest
+# 3. Correctness. Every backend is checked against a float64 reference.
+pytest                            # preferred
+python scripts/run_tests.py       # same suite, no pytest needed (torch only)
 
 # Op-level sweep across every registered backend.
 python -m bench.bench_ops --config lm1b --ops interpolant,semigroup_ce,adaln
@@ -48,6 +49,7 @@ python -m bench.bench_ops --config lm1b --ops interpolant,semigroup_ce,adaln
 | `src/eflow/schedules/` | α(t), hazard, inverse CDF, τ(t) time warp |
 | `src/eflow/models/` | TinyDDiT + insertion head; stubs for borrowed backbones |
 | `scripts/smoke.py` | "does this execute here" check; run this first on a new box |
+| `scripts/run_tests.py` | runs tests/ without pytest installed |
 | `bench/roofline.py` | analytic cost model, runs on CPU |
 | `bench/harness.py` | timing + memory core, deliberately thin |
 | `bench/adapters.py` | plug external profiling tools in here |
@@ -90,10 +92,21 @@ output lands in `result.extra[name]`. `harness.py` never needs to change.
 
 ## Status
 
-Phase 0 complete (skeleton, schedules, registry, harness, analytic model).
-Phase 1 in progress. Nothing has run on a GPU yet — the code is syntax-checked
-and the math is verified in NumPy, but every timing number in `docs/PLAN.md` is
-analytic, not measured. Treat them as predictions to falsify.
+Phase 0 complete. `scripts/smoke.py` and `bench/roofline.py` verified on an
+RTX 3090 Ti (torch 2.5.1+cu121, no Triton): 31 backends execute, 0 fail.
+
+**No timing has been measured yet.** Every number in `docs/PLAN.md` is analytic,
+not observed. Treat them as predictions to falsify, not results.
+
+Known environment gaps on that box, both expected and both handled by
+`available()` guards rather than failures:
+
+* **no Triton** — every `triton` backend skips.
+* **`torch.compile` is dead**, and not only on GPU: inductor fails at the C++
+  stage (no reachable MSVC `cl`), so the CPU path is out too. This matters more
+  than it looks — `compile` is the baseline a hand-written kernel has to beat,
+  so it must work on whatever machine the real benchmarks run on, or every
+  reported speedup is measured against eager and is therefore flattering.
 
 Four of those predictions, in profit order:
 
