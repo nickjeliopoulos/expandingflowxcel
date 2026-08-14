@@ -82,8 +82,18 @@ def build(op, c, device, dtype):
         counts[:, 0] = 1
         return dict(x=torch.randn(B, L, V, **f), t_local=torch.rand(B, L, **f) * active,
                     active=active, counts=counts)
-    if op in ("expand_training", "expand_graph", "flow_map_cont"):
-        return None          # multi-tensor state; covered by tests/, not here
+    if op == "expand_training":
+        return dict(state_x=torch.randn(B, L, V, **f), t_ins=torch.rand(B, L, **f),
+                    s=torch.tensor(0.3, device=device), t=torch.tensor(0.7, device=device))
+    if op == "flow_map_cont":
+        return dict(x_expanded=torch.randn(B, L, 3, **f), v=torch.randn(B, L, 3, **f),
+                    s=torch.tensor(0.2, device=device), t=torch.tensor(0.8, device=device))
+    if op == "expand_graph":
+        active = torch.rand(B, L, device=device) > 0.5
+        counts = torch.zeros(B, L + 1, dtype=torch.long, device=device)
+        counts[:, 0] = 1
+        return dict(x=torch.randn(B, L, 4, **f), E=torch.randn(B, L, L, 5, **f),
+                    active=active, counts=counts)
     return None
 
 
@@ -132,6 +142,15 @@ def main():
         print(f"[{mark}] {name:<34}{msg if status != OK else ''}")
 
     print(f"\n{n_ok} ok, {n_fail} failed, {n_skip} skipped")
+
+    # Hygiene: an op with no reference backend cannot be checked by
+    # test_backend_parity, so a kernel for it would land unverified.
+    orphans = [op for op in registry.ops()
+               if not any(i.reference for i in registry.backends(op))]
+    if orphans:
+        print(f"\nNOTE: {len(orphans)} op(s) have no reference backend and are "
+              f"therefore unverifiable:\n  " + ", ".join(orphans) +
+              "\n  Add one before writing a kernel for any of these.")
     return n_fail
 
 

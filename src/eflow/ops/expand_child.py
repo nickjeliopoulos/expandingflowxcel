@@ -65,11 +65,36 @@ def com_free_reference(x, mask):
     return out
 
 
-@register("com_free", "segment")
-def com_free_segment(x_flat, batch_idx, n_mol):
-    """Ragged CSR form: x_flat [N, 3], batch_idx [N]. index_add + gather."""
-    cnt = torch.zeros(n_mol, device=x_flat.device, dtype=x_flat.dtype)
-    cnt.index_add_(0, batch_idx, torch.ones_like(batch_idx, dtype=x_flat.dtype))
-    s = torch.zeros(n_mol, 3, device=x_flat.device, dtype=x_flat.dtype)
-    s.index_add_(0, batch_idx, x_flat)
-    return x_flat - (s / cnt.clamp_min(1)[:, None])[batch_idx]
+@register("com_free", "segment",
+          note="dense->CSR conversion is timed INSIDE; see docstring")
+def com_free_segment(x, mask):
+    """Ragged/CSR path: flatten to [N,3] + batch index, then index_add.
+
+    Signature is deliberately identical to the dense backends. Backends of one
+    op must be interchangeable -- that is the invariant the whole registry rests
+    on, and an op whose backends take different arguments cannot be checked
+    against a common reference or swapped in a sweep.
+
+    Interpretation warning: the dense->CSR conversion is timed INSIDE this
+    function, on purpose. The repo stores state dense-padded (PLAN.md decision
+    (a)), so reaching for a scatter kernel genuinely costs the conversion.
+    Timing the index_add alone would flatter CSR by hiding a cost the rest of
+    the system actually pays.
+
+    If the state were natively ragged -- PointCloudState carries an optional
+    ``batch_ptr`` for exactly this -- the conversion vanishes and the comparison
+    inverts. That is a state-layout decision, not a kernel one, and it is the
+    real question for the conformer path: GEOM-Drugs reaches 181 atoms against a
+    QM9 median near 18, so dense padding wastes most of the buffer on most
+    molecules. Ablation A8.
+    """
+    B, A, C = x.shape
+    batch_idx = mask.nonzero(as_tuple=False)[:, 0]
+    x_flat = x[mask]
+    cnt = torch.zeros(B, device=x.device, dtype=x.dtype)
+    cnt.index_add_(0, batch_idx, torch.ones_like(batch_idx, dtype=x.dtype))
+    tot = torch.zeros(B, C, device=x.device, dtype=x.dtype)
+    tot.index_add_(0, batch_idx, x_flat)
+    out = torch.zeros_like(x)
+    out[mask] = x_flat - (tot / cnt.clamp_min(1)[:, None])[batch_idx]
+    return out
