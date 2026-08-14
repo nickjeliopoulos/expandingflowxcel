@@ -1,0 +1,56 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.so
+
+# uv
+.uv/
+uv.lock
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project-specific
+.claude/
+*.pdf
+snr_analysis.py
+
+# Benchmark artifacts
+# Results are machine-specific (they embed a GPU fingerprint from
+# harness.env_fingerprint), so they are never committed. Promote a run you want
+# to keep into docs/results/ by hand, with the fingerprint intact.
+results_*.json
+*.parquet
+runs/
+figures/
+
+# Profiler output
+*.ncu-rep
+*.nsys-rep
+*.qdrep
+*.sqlite
+trace_*.json
+
+# Triton / inductor caches
+.triton/
+.inductor_cache/
+torchinductor_*/

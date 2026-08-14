@@ -1,0 +1,10 @@
+# Core runtime deps, mirrored from pyproject.toml [project.dependencies].
+# Prefer `uv sync`; this file exists for environments that cannot use it.
+numpy
+scipy
+torch
+einops
+
+# Optional extras (see pyproject.toml):
+#   pip install -e ".[triton]"   -> triton>=3.0
+#   pip install -e ".[report]"   -> pandas, pyarrow, matplotlib
