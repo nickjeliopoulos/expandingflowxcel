@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import torch
 
-from eflow.ops.registry import register, requires_triton
+from eflow.ops.registry import register, requires_compile, requires_triton
 
 
 def _beta(t_local: torch.Tensor, beta_fn=None) -> torch.Tensor:
@@ -72,7 +72,7 @@ def interpolant_torch(labels, t_local, active, V, sigma=1.0, *,
     return x
 
 
-@register("interpolant", "compile")
+@register("interpolant", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def interpolant_compile(labels, t_local, active, V, sigma=1.0, **kw):
     return interpolant_torch(labels, t_local, active, V, sigma, **kw)

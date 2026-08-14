@@ -24,6 +24,9 @@ class Config:
 
 
 CONFIGS = {
+    # Tiny shapes for smoke-testing that the code RUNS. Not representative of
+    # anything -- never quote a number measured at this config.
+    "smoke":      Config("smoke", B=2, L=8, V=32, D=32, cond=16, blocks=2),
     # App. E.3 -- LM1B, bert-base-uncased vocab, DDiT backbone
     "lm1b":       Config("lm1b", B=128, L=128, V=30522, D=768, cond=128, blocks=12),
     # App. E.2 -- QM9 graphs, DeFoG graph transformer

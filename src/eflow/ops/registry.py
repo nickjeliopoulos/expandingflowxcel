@@ -84,6 +84,36 @@ def requires_triton() -> str | None:
     return None
 
 
+def requires_compile() -> str | None:
+    """torch.compile's GPU path goes through inductor, which needs Triton.
+
+    On Windows without Triton the CUDA backend raises at *call* time, not at
+    decoration time, so an unguarded ``compile`` backend explodes in the middle
+    of a benchmark sweep rather than skipping cleanly. Probe once and cache.
+
+    The CPU backend (C++/OpenMP codegen) does not need Triton but does need a
+    working compiler toolchain, which is also not a given on Windows -- so we
+    probe by actually compiling and running a trivial function rather than by
+    checking for an import.
+    """
+    global _COMPILE_OK
+    if _COMPILE_OK is not None:
+        return _COMPILE_OK
+    try:
+        import torch
+        f = torch.compile(lambda t: t + 1, dynamic=False)
+        f(torch.zeros(2))
+        if torch.cuda.is_available():
+            f(torch.zeros(2, device="cuda"))
+        _COMPILE_OK = None
+    except Exception as e:  # pragma: no cover
+        _COMPILE_OK = f"torch.compile unavailable: {type(e).__name__}: {str(e)[:120]}"
+    return _COMPILE_OK
+
+
+_COMPILE_OK: str | None = None
+
+
 @functools.lru_cache(maxsize=1)
 def load_all() -> None:
     """Import every op module so decorators fire. Called by bench/ and tests/."""

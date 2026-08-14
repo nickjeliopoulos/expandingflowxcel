@@ -25,7 +25,10 @@ uv sync --extra report           # pandas/matplotlib, for benchmark tables
 ## Quick start
 
 ```bash
-# Analytic FLOP/byte model. CPU-only -- no GPU, no torch import.
+# 1. Does it run here at all? Tiny shapes, seconds, no GPU required.
+python scripts/smoke.py
+
+# 2. Analytic FLOP/byte model. CPU-only -- no GPU, no torch import.
 python -m bench.roofline --config lm1b
 
 # Correctness. Every backend is checked against a float64 reference.
@@ -44,6 +47,7 @@ python -m bench.bench_ops --config lm1b --ops interpolant,semigroup_ce,adaln
 | `src/eflow/reference/` | literal transcription of Alg. 1–4; the correctness oracle |
 | `src/eflow/schedules/` | α(t), hazard, inverse CDF, τ(t) time warp |
 | `src/eflow/models/` | TinyDDiT + insertion head; stubs for borrowed backbones |
+| `scripts/smoke.py` | "does this execute here" check; run this first on a new box |
 | `bench/roofline.py` | analytic cost model, runs on CPU |
 | `bench/harness.py` | timing + memory core, deliberately thin |
 | `bench/adapters.py` | plug external profiling tools in here |

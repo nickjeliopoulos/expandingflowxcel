@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import torch
 
-from eflow.ops.registry import register
+from eflow.ops.registry import register, requires_compile
 
 
 @register("gap_counts", "reference", reference=True)
@@ -45,7 +45,7 @@ def gap_counts_torch(active: torch.Tensor) -> torch.Tensor:
     return out
 
 
-@register("gap_counts", "compile")
+@register("gap_counts", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def gap_counts_compile(active):
     return gap_counts_torch(active)

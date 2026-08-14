@@ -65,11 +65,21 @@ def expand_sampling_reference(x, t_local, active, counts, sigma=1.0, *, noise=No
         for k, j in enumerate(slots[:L]):
             new_active[b, k] = True                  # inserted == active, t_i = 0
             if j is None:
+                # NOTE: caller-supplied `noise` is treated as ALREADY scaled by
+                # sigma, so that reference and fast paths are comparable when a
+                # test pins the noise. Only self-drawn noise gets scaled here.
                 out[b, k] = (noise[b, k] if noise is not None
-                             else torch.randn(V, device=x.device)) * sigma
+                             else torch.randn(V, device=x.device) * sigma)
             else:
                 out[b, k] = x[b, j].double()
                 new_tlocal[b, k] = t_local[b, j]
+        # Trailing padding beyond d(t) sits at its Gaussian latent with t_i = 0,
+        # exactly like a not-yet-inserted position (App. C.1) -- NOT at zero.
+        # The vectorised path gets this for free from its `where`; spell it out
+        # here so the two agree.
+        for k in range(min(len(slots), L), L):
+            out[b, k] = (noise[b, k] if noise is not None
+                         else torch.randn(V, device=x.device) * sigma)
     return out, new_active, new_tlocal
 
 
@@ -91,10 +101,21 @@ def expand_sampling_torch(x, t_local, active, counts, sigma=1.0, *, noise=None):
     offset = exclusive_cumsum(counts)            # [B, G] tokens inserted before gap i
     dest = (rank + offset.gather(-1, gap.clamp(max=offset.shape[-1] - 1))).clamp(max=L - 1)
 
-    src = torch.full((B, L), -1, dtype=torch.long, device=dev)
+    # Build the inverse map. Inactive rows must NOT participate: scattering both
+    # active and inactive rows into the same slot leaves the winner up to
+    # scatter's (unspecified) duplicate-index order. Route every inactive row to
+    # a scratch column at index L and slice it off.
+    #
+    # dest is injective on the active set: for active j1 < j2 we have
+    # rank1 < rank2 and gap1 <= gap2, hence offset1 <= offset2 and dest1 < dest2.
+    # So the active writes never collide, provided counts respect the budget
+    # (sum_i l_i <= L - n_s, guaranteed by insertion_sample). The clamp below is
+    # a safety net for a caller that violates that, not part of the contract.
+    src = torch.full((B, L + 1), -1, dtype=torch.long, device=dev)
     j = torch.arange(L, device=dev).expand(B, L)
-    src.scatter_(1, torch.where(active, dest, torch.full_like(dest, L - 1)),
+    src.scatter_(1, torch.where(active, dest, torch.full_like(dest, L)),
                  torch.where(active, j, torch.full_like(j, -1)))
+    src = src[:, :L]
 
     keep = src >= 0
     gathered = x.gather(1, src.clamp_min(0)[..., None].expand(B, L, V))

@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import torch
 
-from eflow.ops.registry import register, requires_triton
+from eflow.ops.registry import register, requires_compile, requires_triton
 
 _EPS = 1e-7
 
@@ -43,7 +43,7 @@ def local_time_torch(t_ins: torch.Tensor, t: torch.Tensor):
     return t_local * active, active
 
 
-@register("local_time", "compile")
+@register("local_time", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def local_time_compile(t_ins, t):
     return local_time_torch(t_ins, t)

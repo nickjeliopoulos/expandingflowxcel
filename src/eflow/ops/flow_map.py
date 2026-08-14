@@ -21,7 +21,7 @@ from __future__ import annotations
 import torch
 import torch.nn.functional as F
 
-from eflow.ops.registry import register, requires_triton
+from eflow.ops.registry import register, requires_compile, requires_triton
 
 
 @register("flow_map", "reference", reference=True)
@@ -38,7 +38,7 @@ def flow_map_torch(logits, x, s, t):
     return ((1 - t) / d) * x + ((t - s) / d) * psi, psi
 
 
-@register("flow_map", "compile")
+@register("flow_map", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def flow_map_compile(logits, x, s, t):
     return flow_map_torch(logits, x, s, t)

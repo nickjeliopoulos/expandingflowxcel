@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import torch
 
-from eflow.ops.registry import register
+from eflow.ops.registry import register, requires_compile
 
 
 @register("insertion_sample", "reference", reference=True)
@@ -95,7 +95,7 @@ def insertion_sample_torch(I_hat, budget, *, law="binomial", generator=None):
     return (capped - prev).round().long()
 
 
-@register("insertion_sample", "compile")
+@register("insertion_sample", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def insertion_sample_compile(I_hat, budget, **kw):
     return insertion_sample_torch(I_hat, budget, **kw)

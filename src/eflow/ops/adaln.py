@@ -46,7 +46,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from eflow.ops.registry import register, requires_triton
+from eflow.ops.registry import register, requires_compile, requires_triton
 
 
 def modulate(x, shift, scale):
@@ -67,7 +67,7 @@ def adaln_torch(x, shift, scale, weight=None, bias=None, eps=1e-6):
     return modulate(h, shift, scale)
 
 
-@register("adaln", "compile")
+@register("adaln", "compile", available=requires_compile)
 @torch.compile(dynamic=False)
 def adaln_compile(x, shift, scale, weight=None, bias=None, eps=1e-6):
     return adaln_torch(x, shift, scale, weight, bias, eps)

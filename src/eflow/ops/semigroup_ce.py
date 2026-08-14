@@ -61,14 +61,21 @@ import torch.nn.functional as F
 from eflow.ops.registry import register, requires_triton
 
 
+def _clamp_min(v, lo=1e-7):
+    """clamp_min for tensors OR python floats. These helpers get called from
+    tests and notebooks with bare floats often enough that requiring tensors is
+    a needless footgun."""
+    return v.clamp_min(lo) if torch.is_tensor(v) else max(v, lo)
+
+
 def omega(s, t, u):
     """w_{s,u,t} of Prop. 5.1. Convex: 1 - w = (t-u)(1-s)/((t-s)(1-u))."""
-    return ((u - s) * (1 - t)) / (((t - s) * (1 - u)).clamp_min(1e-7))
+    return ((u - s) * (1 - t)) / _clamp_min((t - s) * (1 - u))
 
 
 def flow_map_mix(x, psi, s, t):
     """Phi_{s,t}(x) = (1-t)/(1-s) x + (t-s)/(1-s) psi   (Eq. 30)."""
-    d = (1 - s).clamp_min(1e-7)
+    d = _clamp_min(1 - s)
     return ((1 - t) / d) * x + ((t - s) / d) * psi
 
 
@@ -82,7 +89,9 @@ def semigroup_ce_reference(student_logits, psi_su, psi_ut, s, u, t, mask,
     mask           [B,L]    active positions only contribute (Eq. 101-102)
     """
     sl = student_logits.double()
-    w = omega(s, t, u).double()
+    w = omega(s, t, u)
+    w = w.double() if torch.is_tensor(w) else torch.tensor(w, dtype=torch.float64,
+                                                           device=sl.device)
     while w.ndim < sl.ndim:
         w = w[..., None]
 
@@ -102,6 +111,8 @@ def semigroup_ce_reference(student_logits, psi_su, psi_ut, s, u, t, mask,
 def semigroup_ce_torch(student_logits, psi_su, psi_ut, s, u, t, mask,
                        c=1e-6, r=0.5, adaptive_weight=True):
     w = omega(s, t, u)
+    if not torch.is_tensor(w):
+        w = torch.tensor(w, dtype=student_logits.dtype, device=student_logits.device)
     while w.ndim < student_logits.ndim:
         w = w[..., None]
     psibar = torch.lerp(psi_ut, psi_su, w).detach()
